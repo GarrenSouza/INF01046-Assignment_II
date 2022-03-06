@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
     QMainWindow window;
     window.setCentralWidget(chartView);
     window.resize(800, 600);
+    window.setWindowTitle("Grayscale Histogram");
     window.show();
 
     return app.exec();

@@ -41,6 +41,7 @@ QChart &Image::getHistogram()
         *set << double(buckets[i]);
         if (buckets[i] > greatestBucketCount) greatestBucketCount = buckets[i];
     }
+    set->setColor(QColor(25,133,161));
 
     QBarSeries *series = new QBarSeries();
     series->append(set);
