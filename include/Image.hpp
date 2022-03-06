@@ -55,7 +55,7 @@ public:
     Image& matchHistogram(); // TODO
 
     //! Zooms the image in (magnification)
-    Image& zoomIn(float sx, float sy); // TODO
+    Image& zoomIn(uint32_t s);
 
     //! Zooms the image out (magnification)
     Image& zoomOut(uint32_t sx, uint32_t sy);
@@ -65,7 +65,7 @@ public:
 
     //! Applies a 2D convolution over the image
     template<int h, int w, typename T>
-    Image& apply2DConv(Kernel<h, w, T>& filter); // TODO
+    Image& apply2DConv(Kernel<h, w, T>& filter);
 
     //! Mirrors the image horizontally
     Image &mirrorH();
@@ -101,7 +101,7 @@ public:
 template<int h, int w, typename T>
 Image &Image::apply2DConv(Kernel<h, w, T> &filter)
 {
-    assert(h == w && w == 3); // the kernel is assumed to be 3x3
+    assert(h == 3 && h == w); // the kernel is assumed to be 3x3
 
     const uint32_t height = _image_data.height();
     const uint32_t width = _image_data.width();
@@ -109,36 +109,43 @@ Image &Image::apply2DConv(Kernel<h, w, T> &filter)
     const uchar pixel_size = _image_data.depth()/8;
     uchar *dst_row;
 
-    QImage result = QImage(width, height, _image_data.format());
+    QImage result = QImage(width - 2, height - 2, _image_data.format());
     uint32_t pixel;
     Pixel convolutedPixel;
 
     auto getConvolutedPixel = [height, width, pixel_size, filter](QImage& image, uint32_t y, uint32_t x){
         uchar *row;
-        uint32_t pixel;
+        uint64_t accum[3] = {0};
 
-        for (uint32_t i = y; i < y + 3 && i < height - 1; i++) {
-            row = image.scanLine(i);
-            for (uint32_t j = x; j < x + 3 && j < width - 1; j ++) {
-                pixel = j * pixel_size;
-                convolutedPixel = getConvolutedPixel(_image_data, i, j * pixel_size);
-                dst_row[pixel] = convolutedPixel.R;
-                dst_row[pixel + 1] = convolutedPixel.G;
-                dst_row[pixel + 2] = convolutedPixel.B;
+        for (uint32_t i = 0; i < 3; i++) {
+            row = image.scanLine(y + i);
+            for (uint32_t j = 0; j < 3 ; j ++) {
+                accum[0] += filter._data[i][j] * row[x + j * pixel_size];
+                accum[1] += filter._data[i][j] * row[x + j * pixel_size + 1];
+                accum[2] += filter._data[i][j] * row[x + j * pixel_size + 2];
             }
         }
+
+        return Pixel{
+            Image::clamp(uint8_t(accum[0]), uint8_t(0), uint8_t(255)),
+            Image::clamp(uint8_t(accum[1]), uint8_t(0), uint8_t(255)),
+            Image::clamp(uint8_t(accum[2]), uint8_t(0), uint8_t(255)),
+            0
+        };
     };
 
-    for (uint32_t i = 1; i < height - 1; i++) {
+    for (uint32_t i = 0; i < height - 2; i++) { // subtracting 2 in order to prevent the kernel from going over the height
         dst_row = result.scanLine(i);
-        for (uint32_t j = 1; j < width - 1; j ++) {
+        for (uint32_t j = 0; j < width - 2; j++) {  // subtracting 2 in order to prevent the kernel from going over the width
             pixel = j * pixel_size;
-            convolutedPixel = getConvolutedPixel(_image_data, i, j * pixel_size);
+            convolutedPixel = getConvolutedPixel(_image_data, i, pixel);
             dst_row[pixel] = convolutedPixel.R;
             dst_row[pixel + 1] = convolutedPixel.G;
             dst_row[pixel + 2] = convolutedPixel.B;
         }
     }
+
+    _image_data = result;
 
     return *this;
 }

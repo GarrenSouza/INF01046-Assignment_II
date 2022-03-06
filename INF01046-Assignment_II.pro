@@ -13,7 +13,7 @@ SOURCES += \
     mainwindow.cpp \
     src/Image.cpp \
     src/Input.cpp \
-    src/SquareFilter.cpp
+    src/Kernel.cpp
 
 HEADERS += \
     include/Image.hpp \

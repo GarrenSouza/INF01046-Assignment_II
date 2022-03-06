@@ -124,6 +124,69 @@ Image &Image::toNegative()
     return *this;
 }
 
+Image &Image::zoomIn(uint32_t s)
+{
+    if(s){
+        const uint32_t height = _image_data.height();
+        const uint32_t width = _image_data.width();
+
+        const uint32_t new_height = 2 * height - 1;
+        const uint32_t new_width = 2 * width - 1;
+
+        const uchar pixel_size = _image_data.depth()/8;
+        uchar *dst_row, *src_row, *row;
+
+        QImage result = QImage(new_width, new_height, _image_data.format());
+
+        uint32_t pixel_position;
+
+        // scaling
+        for (uint32_t i = 0; i < height; i++) {
+            dst_row = result.scanLine(2 * i);
+            src_row = _image_data.scanLine(i);
+            for (uint32_t j = 0; j < width; j++) {
+                pixel_position = j * pixel_size;
+                dst_row[2 * pixel_position] = src_row[pixel_position];
+                dst_row[2 * pixel_position + 1] = src_row[pixel_position + 1];
+                dst_row[2 * pixel_position + 2] = src_row[pixel_position + 2];
+            }
+        }
+
+        // horizontal interpolation
+        for (uint32_t i = 0; i < new_height; i+=2) {
+            row = result.scanLine(i);
+            for (uint32_t j = 1; j < new_width; j+=2) {
+                pixel_position = j * pixel_size;
+                row[pixel_position] = (row[pixel_position - pixel_size] + row[pixel_position + pixel_size]) >> 1;
+                row[pixel_position + 1] = (row[pixel_position + 1 - pixel_size] + row[pixel_position + 1 + pixel_size]) >> 1;
+                row[pixel_position + 2] = (row[pixel_position + 2 - pixel_size] + row[pixel_position + 2 + pixel_size]) >> 1;
+            }
+        }
+
+        // vertical interpolation
+        uchar *previous_row, *next_row;
+        for (uint32_t i = 0; i < new_width; i+=1) {
+            for (uint32_t j = 1; j < new_height; j+=2) {
+                previous_row = result.scanLine(j - 1);
+                row = result.scanLine(j);
+                next_row = result.scanLine(j + 1);
+
+                pixel_position = i * pixel_size;
+                row[pixel_position] = (previous_row[pixel_position] + next_row[pixel_position]) >> 1;
+                row[pixel_position + 1] = (previous_row[pixel_position + 1] + next_row[pixel_position + 2]) >> 1;
+                row[pixel_position + 2] = (previous_row[pixel_position + 2] + next_row[pixel_position + 2]) >> 1;
+            }
+        }
+
+        _image_data = result;
+
+        // recursively applies the zoom with the 2x2 factor
+        return zoomIn(s - 1);
+    }
+
+    return *this;
+}
+
 Image &Image::zoomOut(uint32_t sx, uint32_t sy)
 {
     const uint32_t height = _image_data.height();
@@ -160,7 +223,7 @@ Image &Image::zoomOut(uint32_t sx, uint32_t sy)
             }
         }
 
-        assert(pixel_counter != 0);
+        assert(pixel_counter != 0); // to ensure no empty window was considered call worthy
 
         Pixel result{
             Image::clamp(uint8_t(accum[0]/pixel_counter), uint8_t(0), uint8_t(255)),

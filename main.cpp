@@ -19,7 +19,14 @@ int main(int argc, char *argv[])
 
     Local::Image image = Local::Image("C:\\Users\\garren\\OneDrive\\Documentos\\test-3\\img\\test_images\\Space_46k.jpg");
 
-    image.zoomOut(1, 1);
+    float filter_data[3][3] = {{0.0625, 0.125, 0.0625}, {0.125, 0.25, 0.125}, {0.0625, 0.125, 0.0625}};
+
+    Local::Kernel<3,3,float> filter(filter_data);
+    filter.rotate180Degrees();
+
+//    image.zoomIn(2);
+
+    image.toGrayscale();
 
     QGraphicsScene scene;
     QGraphicsView view(&scene);
@@ -27,7 +34,19 @@ int main(int argc, char *argv[])
     scene.addItem(&item);
     image.saveToJPEG("./file.jpeg", 95);
     view.setWindowTitle(QString::fromStdString(image.getFilePath()));
-    view.show();
+//    view.show();
+
+//![6]
+    QChart *chart = &image.getHistogram();
+    QChartView *chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+//![6]
+
+//![7]
+    QMainWindow window;
+    window.setCentralWidget(chartView);
+    window.resize(800, 600);
+    window.show();
 
     return app.exec();
 }
