@@ -19,97 +19,40 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::show_image(Local::Image* image, QString window_title)
+{
+    QGraphicsScene *scene = new QGraphicsScene;
+    QGraphicsView *view = new QGraphicsView(scene);
+    QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image->underlyingContainer()));
+
+    scene->addItem(item);
+
+    view->setWindowTitle(window_title);
+    view->show();
+}
+
+void MainWindow::show_chart(QChart *chart, QString window_title)
+{
+    QChartView *chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+
+    QMainWindow *window = new QMainWindow;
+    window->setCentralWidget(chartView);
+    window->resize(800, 600);
+    window->setWindowTitle(window_title);
+    window->show();
+}
+
 
 void MainWindow::on_addImage_action_button_clicked()
 {
 
-    Local::Image *show_image = new Local::Image(ui->addImage_file_path->text().toStdString());
-    this->images[image_index_counter] = *show_image;
+    Local::Image *image_t = new Local::Image(ui->addImage_file_path->text().toStdString());
+    this->images[image_index_counter] = image_t;
 
-    ui->imageList->addItem(QString::fromStdString(std::to_string(image_index_counter++) + " _ " + show_image->getFilePath()));
+    ui->imageList->addItem(QString::fromStdString(std::to_string(image_index_counter++) + " _ " + image_t->getFilePath()));
 
-    QGraphicsScene *scene = new QGraphicsScene;
-    QGraphicsView *view = new QGraphicsView(scene);
-    QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(show_image->underlyingContainer()));
-
-    scene->addItem(item);
-
-    view->setWindowTitle(QString::fromStdString("File path: " +show_image->getFilePath()));
-    view->show();
-}
-
-
-void MainWindow::on_pushButton_8_clicked()
-{
-    Local::Image image = Local::Image("C:\\Users\\garren\\OneDrive\\Documentos\\INF01046-Assignment_II\\img\\test_images\\grumpy.jpg");
-
-//    image.rotate90Deg(1);
-//    image.toGrayscale();
-
-    QGraphicsScene *scene = new QGraphicsScene;
-    QGraphicsView *view = new QGraphicsView(scene);
-    QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image.underlyingContainer()));
-
-    scene->addItem(item);
-
-    view->setWindowTitle(QString::fromStdString("File path: " +image.getFilePath()));
-    view->show();
-
-    auto renderHistogramChart = [](Local::Image &image){
-        QChart *chart = &image.getHistogramChart();
-        QChartView *chartView = new QChartView(chart);
-        chartView->setRenderHint(QPainter::Antialiasing);
-
-        QMainWindow *window = new QMainWindow;
-        window->setCentralWidget(chartView);
-        window->resize(800, 600);
-        window->setWindowTitle(QString::fromStdString("Grayscale Histogram " + image.getFilePath()));
-        window->show();
-    };
-
-    auto renderCumulativeHistogramChart = [](Local::Image &image){
-        QChart *chart = &image.getCumulativeHistogramChart();
-        QChartView *chartView = new QChartView(chart);
-        chartView->setRenderHint(QPainter::Antialiasing);
-
-        QMainWindow *window = new QMainWindow;
-        window->setCentralWidget(chartView);
-        window->resize(800, 600);
-        window->setWindowTitle(QString::fromStdString("Grayscale Cumulative Histogram " + image.getFilePath()));
-        window->show();
-    };
-
-    Local::Image test_image2 = Local::Image("C:\\Users\\garren\\OneDrive\\Documentos\\INF01046-Assignment_II\\img\\test_images\\grumpy.jpg");
-
-    float gaussian[3][3] = {{0.0625, 0.125, 0.0625}, {0.125, 0.25, 0.125},  {0.0625, 0.125, 0.0625}};
-    float laplacian[3][3] = {{0, -1, 0}, {-1, 4, -1}, {0, -1, 0}};
-    float high_pass[3][3] = {{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}};
-    float prewitt_hx[3][3] = {{-1, 0, 1}, {-1, 0, 1}, {-1, 0, 1}};
-    float prewitt_hy[3][3] = {{-1, -1, -1}, {0, 0, 0},  {1, 1, 1}};
-    float sobel_hx[3][3] = {{-1, 0, 1}, {-2, 0, 2},  {-1, 0, 1}};
-    float sobel_hy[3][3] = {{-1, -2, -1}, {0, 0, 0},  {1, 2, 1}};
-
-    Local::Kernel<3,3,float> kernel(sobel_hx);
-//    kernel.rotate180Degrees();
-//    test_image2.toGrayscale();
-//    test_image2.matchHistogram(image);
-//    test_image2.apply2DConv(kernel, 127.0f);
-    test_image2.adjustBrightness(32);
-
-    QGraphicsScene *scene1 = new QGraphicsScene;
-    QGraphicsView *view1 = new QGraphicsView(scene1);
-    QGraphicsPixmapItem *item1 = new QGraphicsPixmapItem(QPixmap::fromImage(test_image2.underlyingContainer()));
-
-    scene1->addItem(item1);
-
-    view1->setWindowTitle(QString::fromStdString("File path: " +test_image2.getFilePath()));
-    view1->show();
-//    if(ui->imageList->selectedItems().size()>0){
-//        QListWidgetItem* item = ui->imageList->selectedItems().at(0);
-//        ui->imageList->removeItemWidget(item);
-//        ui->imageList->takeItem(item->listWidget()->row(item));
-//        this->images.erase(std::stoi(item->text().toStdString()));
-//    }
+    show_image(image_t, QString::fromStdString("File path: " +image_t->getFilePath()));
 }
 
 
@@ -126,101 +69,155 @@ void MainWindow::on_addFilter_action_button_clicked()
     }
 
     if(values.size() == 9){
-        Local::Kernel<3,3,float> filter;
+        Local::Kernel<3,3,float>* filter = new Local::Kernel<3,3,float>;
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                filter._data[i][j] = values[i * 3 + j];
+                filter->_data[i][j] = values[i * 3 + j];
             }
         }
-        ui->filterList->addItem(QString::fromStdString(std::to_string(filter_index_counter++) + " - " + filter.getInfo()));
+        ui->filterList->addItem(QString::fromStdString(std::to_string(filter_index_counter) + " - " + filter->getInfo()));
+        filters[filter_index_counter] = filter;
+        filter_index_counter++;
     }
 }
 
 
-void MainWindow::on_pushButton_14_clicked()
+
+void MainWindow::on_imageList_itemDoubleClicked(QListWidgetItem *item)
+{
+    Local::Image *image_to_be_shown = images[std::stoi(item->text().toStdString())];
+    show_image(image_to_be_shown, QString::fromStdString("File Path: " + image_to_be_shown->getFilePath()));
+}
+
+
+void MainWindow::on_getHistogram_clicked()
+{
+    show_chart(&current_image->getHistogramChart(), QString::fromStdString("Grayscale Histogram Chart for: " + current_image->getFilePath()));
+}
+
+
+void MainWindow::on_imageList_itemClicked(QListWidgetItem *item)
+{
+    current_image = images[std::stoi(item->text().toStdString())];
+}
+
+
+void MainWindow::on_equalizeHistogram_clicked()
+{
+    show_chart(&current_image->getHistogramChart(), QString::fromStdString("Grayscale Histogram Chart for: " + current_image->getFilePath()));
+    show_chart(&current_image->equalizeHistogram().getHistogramChart(), QString::fromStdString("Post equalization Grayscale Histogram Chart for: " + current_image->getFilePath()));
+}
+
+
+void MainWindow::on_MatchHistogram_clicked()
+{
+    show_chart(&current_image->getHistogramChart(), QString::fromStdString("Grayscale Histogram Chart for: " + current_image->getFilePath()));
+    show_chart(&current_image->matchHistogram(*images[std::stoi(ui->matchHistogramFIeld->text().toStdString())]).getHistogramChart(), QString::fromStdString("Post matching Grayscale Histogram Chart for: " + current_image->getFilePath()));
+}
+
+
+void MainWindow::on_resetImage_clicked()
+{
+    current_image->reset();
+}
+
+
+void MainWindow::on_contrastAdjust_clicked()
+{
+    current_image->adjustContrast(std::stof(ui->contrastField->text().toStdString()));
+}
+
+
+void MainWindow::on_brightnessAdjust_clicked()
+{
+    current_image->adjustBrightness(std::stoi(ui->brightnessField->text().toStdString()));
+}
+
+
+void MainWindow::on_getGrayscale_clicked()
+{
+    current_image->toGrayscale();
+}
+
+
+void MainWindow::on_getNegative_clicked()
+{
+    current_image->toNegative();
+}
+
+
+void MainWindow::on_verticalMirror_clicked()
+{
+    current_image->mirrorV();
+}
+
+
+void MainWindow::on_HorizontalMirror_clicked()
+{
+    current_image->mirrorH();
+}
+
+
+void MainWindow::on_Quantize_clicked()
+{
+    current_image->quantize(std::stoi(ui->quantizationField->text().toStdString()));
+}
+
+
+void MainWindow::on_zoomIn_clicked()
+{
+    current_image->zoomIn(std::stoi(ui->zoomInField->text().toStdString()));
+}
+
+
+void MainWindow::on_zoomOut_clicked()
+{
+    current_image->zoomOut(std::stoi(ui->zoomOutXFIeld->text().toStdString()), std::stoi(ui->zoomOutYFIeld->text().toStdString()));
+}
+
+
+void MainWindow::on_rotate90_clicked()
+{
+    current_image->rotate90Deg(std::stoi(ui->rotate90Field->text().toStdString()));
+}
+
+
+void MainWindow::on_applyFilter_clicked()
+{
+    current_image->apply2DConv(*current_filter, std::stof(ui->pre_clamp_offset->text().toStdString()));
+}
+
+
+void MainWindow::on_deleteImage_clicked()
+{
+    if(ui->imageList->selectedItems().size()>0){
+        QListWidgetItem* item = ui->imageList->selectedItems().at(0);
+        ui->imageList->removeItemWidget(item);
+        ui->imageList->takeItem(item->listWidget()->row(item));
+        this->images.erase(std::stoi(item->text().toStdString()));
+    }
+}
+
+
+void MainWindow::on_deleteFilter_clicked()
 {
     if(ui->filterList->selectedItems().size()>0){
         QListWidgetItem* item = ui->filterList->selectedItems().at(0);
         ui->filterList->removeItemWidget(item);
         ui->filterList->takeItem(item->listWidget()->row(item));
+        this->filters.erase(std::stoi(item->text().toStdString()));
     }
 }
 
-void MainWindow::on_pushButton_clicked()
+
+void MainWindow::on_filterList_itemClicked(QListWidgetItem *item)
 {
-    Local::Image image = Local::Image("C:\\Users\\garren\\OneDrive\\Documentos\\INF01046-Assignment_II\\img\\test_images\\grumpy.jpg.jpg");
-
-//    image.rotate90Deg(1);
-    image.toGrayscale();
-
-    QGraphicsScene *scene = new QGraphicsScene;
-    QGraphicsView *view = new QGraphicsView(scene);
-    QGraphicsPixmapItem *item = new QGraphicsPixmapItem(QPixmap::fromImage(image.underlyingContainer()));
-
-    scene->addItem(item);
-
-    view->setWindowTitle(QString::fromStdString("File path: " +image.getFilePath()));
-    view->show();
-
-    auto renderHistogramChart = [](Local::Image &image){
-        QChart *chart = &image.getHistogramChart();
-        QChartView *chartView = new QChartView(chart);
-        chartView->setRenderHint(QPainter::Antialiasing);
-
-        QMainWindow *window = new QMainWindow;
-        window->setCentralWidget(chartView);
-        window->resize(800, 600);
-        window->setWindowTitle(QString::fromStdString("Grayscale Histogram " + image.getFilePath()));
-        window->show();
-    };
-
-    auto renderCumulativeHistogramChart = [](Local::Image &image){
-        QChart *chart = &image.getCumulativeHistogramChart();
-        QChartView *chartView = new QChartView(chart);
-        chartView->setRenderHint(QPainter::Antialiasing);
-
-        QMainWindow *window = new QMainWindow;
-        window->setCentralWidget(chartView);
-        window->resize(800, 600);
-        window->setWindowTitle(QString::fromStdString("Grayscale Cumulative Histogram " + image.getFilePath()));
-        window->show();
-    };
-
-    Local::Image test_image2 = Local::Image("C:\\Users\\garren\\OneDrive\\Documentos\\INF01046-Assignment_II\\img\\test_images\\grumpy.jpg.jpg");
-
-    float gaussian[3][3] = {{0.0625, 0.125, 0.0625}, {0.125, 0.25, 0.125},  {0.0625, 0.125, 0.0625}};
-    float laplacian[3][3] = {{0, -1, 0}, {-1, 4, -1}, {0, -1, 0}};
-    float high_pass[3][3] = {{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}};
-    float prewitt_hx[3][3] = {{-1, 0, 1}, {-1, 0, 1}, {-1, 0, 1}};
-    float prewitt_hy[3][3] = {{-1, -1, -1}, {0, 0, 0},  {1, 1, 1}};
-    float sobel_hx[3][3] = {{-1, 0, 1}, {-2, 0, 2},  {-1, 0, 1}};
-    float sobel_hy[3][3] = {{-1, -2, -1}, {0, 0, 0},  {1, 2, 1}};
-
-    Local::Kernel<3,3,float> kernel(sobel_hx);
-//    kernel.rotate180Degrees();
-//    test_image2.toGrayscale();
-//    test_image2.matchHistogram(image);
-//    test_image2.apply2DConv(kernel, 127.0f);
-    test_image2.adjustBrightness(25);
-
-    QGraphicsScene *scene1 = new QGraphicsScene;
-    QGraphicsView *view1 = new QGraphicsView(scene1);
-    QGraphicsPixmapItem *item1 = new QGraphicsPixmapItem(QPixmap::fromImage(test_image2.underlyingContainer()));
-
-    scene1->addItem(item1);
-
-    view1->setWindowTitle(QString::fromStdString("File path: " +test_image2.getFilePath()));
-    view1->show();
-
-//    renderHistogramChart(image);
-//    renderHistogramChart(test_image2);
-
-//    renderCumulativeHistogramChart(image);
-//    renderCumulativeHistogramChart(test_image2);
+    current_filter = filters[std::stoi(item->text().toStdString())];
 }
 
-void MainWindow::on_imageList_itemDoubleClicked(QListWidgetItem *item)
-{
 
+void MainWindow::on_saveImage_clicked()
+{
+    current_image->saveToJPEG(ui->outImageField->text().toStdString(), 95);
 }
 

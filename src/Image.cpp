@@ -32,8 +32,6 @@ Image &Image::reset()
 QChart &Image::getCumulativeHistogramChart()
 {
     double *buckets = this->getCumulativeHistogram();
-    uint32_t height = _image_data.height();
-    uint32_t width = _image_data.width();
 
     QBarSet *set = new QBarSet("");
     for (uint64_t i = 0; i < 256 ; i++ ) {
@@ -243,19 +241,21 @@ Image &Image::equalizeHistogram()
 
 Image &Image::matchHistogram(Image &target)
 {
+    this->toGrayscale();
     const uint32_t height = _image_data.height();
     const uint32_t width = _image_data.width();
 
     const uchar pixel_size = _image_data.depth()/8;
     uchar *row;
 
-    double *hist, *target_hist, *cumulative_histogram, *target_cumulative_histogram;
+    double *cumulative_histogram, *target_cumulative_histogram;
     double HM_f[256];
 
     uint32_t pixel;
 
-    hist = this->getHistogram();
-    target_hist = target.getHistogram();
+    Local::Image target_backup = target;
+    target.toGrayscale();
+
     cumulative_histogram = this->getCumulativeHistogram();
     target_cumulative_histogram = target.getCumulativeHistogram();
 
@@ -283,7 +283,7 @@ Image &Image::matchHistogram(Image &target)
         }
     }
 
-    this->toGrayscale();
+    target = target_backup;
     return *this;
 }
 
@@ -494,7 +494,7 @@ Image &Image::mirrorV() {
     uint32_t height = _image_data.height();
     uint32_t width = _image_data.width();
 
-    uchar *buffer = new uchar[width];
+    uchar *buffer = new uchar[_image_data.bytesPerLine()];
     uchar *b_buffer, *row;
     int row_blength = _image_data.bytesPerLine();
 
