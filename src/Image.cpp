@@ -2,15 +2,19 @@
 
 namespace Local {
 
+Image::Image(){
+
+}
+
 Image::Image(std::string filePath) : _file_path(filePath) {
     _image_data = QImage(filePath.c_str());
     _original_image_data = QImage(filePath.c_str());
 }
 
 Image::Image(const Image &other) :
-                                _file_path(other._file_path),
-                                _original_image_data(other._original_image_data.copy(0, 0, other._original_image_data.width(), other._original_image_data.height())),
-                                _image_data(other._image_data.copy(0, 0, other._image_data.width(), other._image_data.height())){}
+    _file_path(other._file_path),
+    _original_image_data(other._original_image_data.copy(0, 0, other._original_image_data.width(), other._original_image_data.height())),
+    _image_data(other._image_data.copy(0, 0, other._image_data.width(), other._image_data.height())){}
 
 Image &Image::operator=(const Image &other) {
     _image_data = other._image_data.copy(0, 0, other._image_data.width(), other._image_data.height());
@@ -19,9 +23,44 @@ Image &Image::operator=(const Image &other) {
     return *this;
 }
 
+Image &Image::reset()
+{
+    _image_data = _original_image_data.copy(0, 0, _original_image_data.width(), _original_image_data.height());
+    return *this;
+}
+
+QChart &Image::getCumulativeHistogramChart()
+{
+    double *buckets = this->getCumulativeHistogram();
+    uint32_t height = _image_data.height();
+    uint32_t width = _image_data.width();
+
+    QBarSet *set = new QBarSet("");
+    for (uint64_t i = 0; i < 256 ; i++ ) {
+        *set << (buckets[i] * 255);
+    }
+
+    set->setColor(QColor(25,133,161));
+
+    QBarSeries *series = new QBarSeries();
+    series->append(set);
+
+    QChart *chart = new QChart();
+    chart->addSeries(series);
+    chart->setTitle(QString::fromStdString(_file_path + " grayscale cumulative histogram"));
+    chart->setAnimationOptions(QChart::SeriesAnimations);
+
+    QValueAxis *axisY = new QValueAxis();
+    axisY->setRange(0, buckets[255] * 255);
+    chart->addAxis(axisY, Qt::AlignLeft);
+    series->attachAxis(axisY);
+
+    return *chart;
+}
+
 QChart &Image::getHistogramChart()
 {
-    float *buckets = this->getHistogram();
+    double *buckets = this->getHistogram();
     uint32_t height = _image_data.height();
     uint32_t width = _image_data.width();
 
@@ -51,43 +90,57 @@ QChart &Image::getHistogramChart()
     return *chart;
 }
 
-float* Image::getHistogram()
+double* Image::getHistogram()
 {
-    float *buckets = new float[256];
+    double *buckets = new double[256];
 
     for (uint32_t j = 0; j < 256; j++) {
-        buckets[j] = 0;
+        buckets[j] = 0.0f;
     }
 
     uint32_t height = _image_data.height();
     uint32_t width = _image_data.width();
-    uchar pixel_size = _image_data.depth()/8;
+    uint32_t pixel_size = _image_data.depth()/8;
 
     uchar *row;
 
     QImage backup = _image_data.copy(0, 0, width, height);
     this->toGrayscale();
-    // first we count how many pixels use each tone (assuming we are dealing with a grayscale image)
+
     for (uint32_t i = 0; i < height; i++) {
         row = _image_data.scanLine(i);
         for (uint32_t j = 0; j < width; j++) {
-            buckets[*(row + j * pixel_size)] += 1;
+            buckets[row[j * pixel_size]] += 1;
         }
     }
 
     for (uint32_t j = 0; j < 256; j++) {
-        buckets[j] /= width * height;
+        buckets[j] /= (width * height);
     }
 
     _image_data = backup;
     return buckets;
 }
 
-float *Image::getCumulativeHistogram()
+double *Image::getCumulativeHistogram()
 {
-    float *histogram = this->getHistogram();
-    float *cumulative_histogram = new float[256];
-    float alpha = 255.0f / (_image_data.width() * _image_data.height());
+    double *histogram = this->getHistogram();
+    double *cumulative_histogram = new double[256];
+
+    cumulative_histogram[0] = histogram[0];
+
+    for (uint32_t i = 1; i < 256; i++){
+        cumulative_histogram[i] = histogram[i] + cumulative_histogram[i - 1];
+    }
+
+    return cumulative_histogram;
+}
+
+double *Image::getRenormalizedCumulativeHistogram()
+{
+    double *histogram = this->getHistogram();
+    double *cumulative_histogram = new double[256];
+    double alpha = 255.0f / (_image_data.width() * _image_data.height());
 
     cumulative_histogram[0] = alpha * histogram[0];
     for (uint32_t i = 1; i < 256; i++)
@@ -131,9 +184,9 @@ Image &Image::adjustContrast(float alpha)
         row = _image_data.scanLine(i);
         for (uint32_t j = 0; j < width; j++) {
             pixel = j * pixel_size;
-            row[pixel] = uchar(Image::clamp(float(row[pixel]) * alpha, 0.0f, 255.0f));
-            row[pixel + 1] = uchar(Image::clamp(float(row[pixel]) * alpha, 0.0f, 255.0f));
-            row[pixel + 2] = uchar(Image::clamp(float(row[pixel]) * alpha, 0.0f, 255.0f));
+            row[pixel] = uchar(Image::clamp(float(row[pixel]) * alpha, float(0.0f), float(255.0f)));
+            row[pixel + 1] = uchar(Image::clamp(float(row[pixel + 1]) * alpha, float(0.0f), float(255.0f)));
+            row[pixel + 2] = uchar(Image::clamp(float(row[pixel + 2]) * alpha, float(0.0f), float(255.0f)));
         }
     }
 
@@ -153,9 +206,9 @@ Image &Image::toNegative()
         row = _image_data.scanLine(i);
         for (uint32_t j = 0; j < width; j++) {
             pixel = j * pixel_size;
-            row[pixel] = Image::clamp(255 - row[pixel], 0, 255);
-            row[pixel + 1] = Image::clamp(255 - row[pixel + 1], 0, 255);
-            row[pixel + 2] = Image::clamp(255 - row[pixel + 2], 0, 255);
+            row[pixel] = 255 - row[pixel];
+            row[pixel + 1] = 255 - row[pixel + 1];
+            row[pixel + 2] = 255 - row[pixel + 2];
         }
     }
 
@@ -172,16 +225,16 @@ Image &Image::equalizeHistogram()
 
     uint32_t pixel_position;
 
-    float *cum_buckets = getCumulativeHistogram();
+    double *cumulative_histogram = getRenormalizedCumulativeHistogram();
     uint32_t total_pixels = width * height;
 
     for (uint32_t i = 0; i < height; i++) {
         row = _image_data.scanLine(i);
         for (uint32_t j = 0; j < width; j++) {
             pixel_position = j * pixel_size;
-            row[pixel_position] = uint8_t(cum_buckets[row[pixel_position]] * total_pixels);
-            row[pixel_position + 1] = uint8_t(cum_buckets[row[pixel_position + 1]] * total_pixels);
-            row[pixel_position + 2] = uint8_t(cum_buckets[row[pixel_position + 2]] * total_pixels);
+            row[pixel_position] = uint8_t(cumulative_histogram[row[pixel_position]] * total_pixels);
+            row[pixel_position + 1] = uint8_t(cumulative_histogram[row[pixel_position + 1]] * total_pixels);
+            row[pixel_position + 2] = uint8_t(cumulative_histogram[row[pixel_position + 2]] * total_pixels);
         }
     }
 
@@ -193,30 +246,30 @@ Image &Image::matchHistogram(Image &target)
     const uint32_t height = _image_data.height();
     const uint32_t width = _image_data.width();
 
-    const uint32_t new_height = 2 * height - 1;
-    const uint32_t new_width = 2 * width - 1;
-
     const uchar pixel_size = _image_data.depth()/8;
-    uchar *dst_row, *src_row, *row;
+    uchar *row;
 
-    float *hist, *target_hist, *cum_hist, *target_cum_hist;
-    float HM[256];
+    double *hist, *target_hist, *cumulative_histogram, *target_cumulative_histogram;
+    double HM_f[256];
 
     uint32_t pixel;
 
     hist = this->getHistogram();
     target_hist = target.getHistogram();
-    cum_hist = this->getCumulativeHistogram();
-    target_cum_hist = target.getCumulativeHistogram();
+    cumulative_histogram = this->getCumulativeHistogram();
+    target_cumulative_histogram = target.getCumulativeHistogram();
 
-    auto find_target_shade_level_closest_to = [cum_hist, target_cum_hist](uint8_t shade){
-        uint32_t i = 0;
-        for (; i < 256 && target_cum_hist[i] < cum_hist[shade]; i++);
-        return Image::clamp(uint8_t(i), uint8_t(0), uint8_t(255));
+    auto find_target_shade_level_closest_to = [cumulative_histogram, target_cumulative_histogram](uint8_t shade){
+        uint32_t i = 1;
+        double minimun_difference = fabs(cumulative_histogram[shade] - target_cumulative_histogram[0]), current_difference;
+        for (; i < 256 && (current_difference = fabs(cumulative_histogram[shade] - target_cumulative_histogram[i])) < minimun_difference; i++){
+            minimun_difference = current_difference;
+        }
+        return i - 1;
     };
 
-    for (uint32_t i = 0; i < 256; i++) {
-        HM[i] = find_target_shade_level_closest_to(i);
+    for (uint32_t shade_level = 0; shade_level < 256; shade_level++) {
+        HM_f[shade_level] = find_target_shade_level_closest_to(uint8_t(shade_level));
     }
 
     for (uint32_t i = 0; i < height; i++) {
@@ -224,9 +277,9 @@ Image &Image::matchHistogram(Image &target)
 
         for (uint32_t j = 0; j < width; j++) {
             pixel = j * pixel_size;
-            row[pixel] = HM[row[pixel]];
-            row[pixel + 1] = HM[row[pixel + 1]];
-            row[pixel + 2] = HM[row[pixel + 2]];
+            row[pixel] = HM_f[row[pixel]];
+            row[pixel + 1] = HM_f[row[pixel + 1]];
+            row[pixel + 2] = HM_f[row[pixel + 2]];
         }
     }
 
@@ -466,7 +519,7 @@ Image &Image::toGrayscale() {
     uint32_t width = _image_data.width();
 
     uchar *row, pixel_size = _image_data.depth()/8;
-    float L;
+    double L;
     int offset;
 
     for (size_t i = 0; i < height; i++) {
@@ -484,7 +537,6 @@ Image &Image::toGrayscale() {
 }
 
 bool Image::saveToJPEG(std::string filePath, int quality) {
-    // TODO Recap on PNG and JPEG compression techniques in order to answer the first question appropriately
     return _image_data.save(QString(filePath.c_str()), "JPG", quality);
 }
 
@@ -515,11 +567,11 @@ Image &Image::quantize(int n_of_tones) {
     int current_tone_range = t2 - t1 + 1; // must be stored with the appropriate value range (i.e.: must prevent overflow)
 
     if (n_of_tones < current_tone_range) {
-        float bin_size = float(current_tone_range) / n_of_tones;
+        double bin_size = double(current_tone_range) / n_of_tones;
         uchar quantized_value, *image_row;
 
         int offset;
-        float alpha, bin_center;
+        double alpha, bin_center;
 
         std::cout << height << ", " << width << ", " << int(pixel_size) << "bytes per pixel" << std::endl;
 
@@ -553,6 +605,16 @@ std::string Image::info() {
 std::string Image::getFilePath()
 {
     return _file_path;
+}
+
+uint32_t Image::getWidth()
+{
+    return _image_data.width();
+}
+
+uint32_t Image::getHeight()
+{
+    return _image_data.height();
 }
 
 } // namespace Local

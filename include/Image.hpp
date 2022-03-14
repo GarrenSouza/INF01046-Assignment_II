@@ -28,6 +28,7 @@ private:
     QImage _image_data;
 
 public:
+    Image();
     Image(std::string filePath);
 
     //! The copy constructor
@@ -36,14 +37,22 @@ public:
     //! The copy-assignment operator
     Image &operator=(const Image &other);
 
+    Image& reset();
+
+    //! Get the grayscale image cumulative histogram chart
+    QChart& getCumulativeHistogramChart();
+
     //! Get the grayscale image histogram chart
     QChart& getHistogramChart();
 
     //! Get the grayscale image's histogram
-    float* getHistogram();
+    double* getHistogram();
 
     //! Get the grayscale image's cumulative histogram
-    float* getCumulativeHistogram();
+    double* getCumulativeHistogram();
+
+    //! Get the grayscale image's cumulative histogram
+    double* getRenormalizedCumulativeHistogram();
 
     //! Tweak the brightness of each picture element by clamping its sum with delta inside [0, 255]
     Image& adjustBrightness(int8_t delta);
@@ -71,7 +80,7 @@ public:
 
     //! Applies a 2D convolution over the image
     template<int h, int w, typename T>
-    Image& apply2DConv(Kernel<h, w, T>& filter);
+    Image& apply2DConv(Kernel<h, w, T>& filter, T pre_clamp_offset);
 
     //! Mirrors the image horizontally
     Image &mirrorH();
@@ -96,6 +105,12 @@ public:
     //! Returns the file path from where the image was originally loaded
     std::string getFilePath();
 
+    //! Returns the width
+    uint32_t getWidth();
+
+    //! Returns the height
+    uint32_t getHeight();
+
     //! Clamps the value to the interval bounded below by min and above by max
     template<typename T>
     static T clamp(T value, T min, T max)
@@ -105,9 +120,10 @@ public:
 };
 
 template<int h, int w, typename T>
-Image &Image::apply2DConv(Kernel<h, w, T> &filter)
+Image &Image::apply2DConv(Kernel<h, w, T> &filter, T pre_clamp_offset)
 {
     assert(h == 3 && h == w); // the kernel is assumed to be 3x3
+    filter.rotate180Degrees();
 
     const uint32_t height = _image_data.height();
     const uint32_t width = _image_data.width();
@@ -119,23 +135,23 @@ Image &Image::apply2DConv(Kernel<h, w, T> &filter)
     uint32_t pixel;
     Pixel convolutedPixel;
 
-    auto getConvolutedPixel = [height, width, pixel_size, filter](QImage& image, uint32_t y, uint32_t x){
+    auto getConvolutedPixel = [height, width, pixel_size, filter, pre_clamp_offset](QImage& image, uint32_t y, uint32_t x){
         uchar *row;
-        uint64_t accum[3] = {0};
+        double accum[3] = {0};
 
         for (uint32_t i = 0; i < 3; i++) {
             row = image.scanLine(y + i);
             for (uint32_t j = 0; j < 3 ; j ++) {
-                accum[0] += filter._data[i][j] * row[x + j * pixel_size];
-                accum[1] += filter._data[i][j] * row[x + j * pixel_size + 1];
-                accum[2] += filter._data[i][j] * row[x + j * pixel_size + 2];
+                accum[0] += filter._data[i][j] * row[(x + j) * pixel_size];
+                accum[1] += filter._data[i][j] * row[(x + j) * pixel_size + 1];
+                accum[2] += filter._data[i][j] * row[(x + j) * pixel_size + 2];
             }
         }
 
         return Pixel{
-            Image::clamp(uint8_t(accum[0]), uint8_t(0), uint8_t(255)),
-            Image::clamp(uint8_t(accum[1]), uint8_t(0), uint8_t(255)),
-            Image::clamp(uint8_t(accum[2]), uint8_t(0), uint8_t(255)),
+            Image::clamp(uint8_t(accum[0] + pre_clamp_offset), uint8_t(0), uint8_t(255)),
+            Image::clamp(uint8_t(accum[1] + pre_clamp_offset), uint8_t(0), uint8_t(255)),
+            Image::clamp(uint8_t(accum[2] + pre_clamp_offset), uint8_t(0), uint8_t(255)),
             0
         };
     };
@@ -144,7 +160,7 @@ Image &Image::apply2DConv(Kernel<h, w, T> &filter)
         dst_row = result.scanLine(i);
         for (uint32_t j = 0; j < width - 2; j++) {  // subtracting 2 in order to prevent the kernel from going over the width
             pixel = j * pixel_size;
-            convolutedPixel = getConvolutedPixel(_image_data, i, pixel);
+            convolutedPixel = getConvolutedPixel(_image_data, i, j);
             dst_row[pixel] = convolutedPixel.R;
             dst_row[pixel + 1] = convolutedPixel.G;
             dst_row[pixel + 2] = convolutedPixel.B;

@@ -11,10 +11,17 @@ template<int h, int w, typename T>
 class Kernel{
 public:
     Kernel(T data[h][w]);
+    Kernel();
     T _data[h][w];
     Kernel& rotate180Degrees();
     std::string getInfo();
 };
+
+template<int h, int w, typename T>
+Kernel<h, w, T>::Kernel()
+{
+
+}
 
 template<int h, int w, typename T>
 Kernel<h, w, T>::Kernel(T data[h][w])
@@ -59,7 +66,6 @@ std::string Kernel<h, w, T>::getInfo(){
                ss << _data[i][j] << ", ";
         }
         ss << _data[i][w - 1] << "}";
-        if (h - i > 1) ss << "\n";
     }
     return ss.str();
 }
